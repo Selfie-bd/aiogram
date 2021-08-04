@@ -7,7 +7,9 @@ class Downloadable:
     Mixin for files
     """
 
-    async def download(self, destination=None, timeout=30, chunk_size=65536, seek=True, make_dirs=True):
+    async def download(self, destination=None,
+                       timeout=30, chunk_size=65536, seek=True, make_dirs=True,
+                       progress=None, progress_args=()):
         """
         Download file
 
@@ -16,6 +18,9 @@ class Downloadable:
         :param chunk_size: Integer
         :param seek: Boolean - go to start of file when downloading is finished.
         :param make_dirs: Make dirs if not exist
+        :progress: A callable func which have a positional arguments `(current, total)` 
+                  where current returns number of bytes download ed and total return total size of file in bytes
+        :progress_args: Optional arguments to be passed in progress func like message for showing the current status.
         :return: destination
         """
         file = await self.get_file()
@@ -32,7 +37,8 @@ class Downloadable:
             os.makedirs(os.path.dirname(destination), exist_ok=True)
 
         return await self.bot.download_file(file_path=file.file_path, destination=destination, timeout=timeout,
-                                            chunk_size=chunk_size, seek=seek)
+                                            chunk_size=chunk_size, seek=seek,
+                                            progress=progress, progress_args=progress_args)
 
     async def get_file(self):
         """
