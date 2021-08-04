@@ -4,6 +4,7 @@ import io
 import ssl
 import typing
 import warnings
+import functools
 from contextvars import ContextVar
 from typing import Dict, List, Optional, Union, Type
 
@@ -212,7 +213,9 @@ class BaseBot:
                             destination: Optional[base.InputFile] = None,
                             timeout: Optional[base.Integer] = sentinel,
                             chunk_size: Optional[base.Integer] = 65536,
-                            seek: Optional[base.Boolean] = True) -> Union[io.BytesIO, io.FileIO]:
+                            seek: Optional[base.Boolean] = True,
+                            progress: callable = None,
+                            progress_args: tuple = ()) -> Union[io.BytesIO, io.FileIO]:
         """
         Download file by file_path to destination
 
@@ -225,6 +228,13 @@ class BaseBot:
         :param timeout: Integer
         :param chunk_size: Integer
         :param seek: Boolean - go to start of file when downloading is finished.
+        :progress: Callable - Pass a callback function to view the file transmission progress.
+                   The function must take *(current, total)* as positional arguments (look at Other Parameters below for a
+                   detailed description) and will be called back each time a new file chunk has been successfully
+                   transmitted.
+        :progress_args: Tuple -                 Extra custom arguments for the progress callback function.
+                   You can pass anything you need to be available in the progress callback scope; for example, a Message
+                   object or a Client instance in order to edit the message with the updated progress status.
         :return: destination
         """
         if destination is None:
@@ -234,12 +244,26 @@ class BaseBot:
 
         dest = destination if isinstance(destination, io.IOBase) else open(destination, 'wb')
         async with self.session.get(url, timeout=timeout, proxy=self.proxy, proxy_auth=self.proxy_auth) as response:
+            downloaded = 0
+            file_size = int(response.headers["Content-Length"])
+
             while True:
                 chunk = await response.content.read(chunk_size)
                 if not chunk:
                     break
+
+                downloaded += len(chunk)
                 dest.write(chunk)
                 dest.flush()
+
+                if progress: # taken from pyrogram
+                    func = functools.partial(
+                        progress,
+                        downloaded,
+                        file_size,
+                        *progress_args
+                    )
+
         if seek:
             dest.seek(0)
         return dest
